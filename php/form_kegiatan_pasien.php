@@ -149,9 +149,11 @@ if ($stmtExisting !== false) {
     <?php endif; ?>
 
     <form method="get" class="row g-2 align-items-end mb-4 bg-light p-3 rounded border">
+      <input type="hidden" name="id_pasien" value="<?= (int)$id_pasien ?>">
+      <input type="hidden" name="tab" value="kegiatan">
       <div class="col-auto">
-        <label class="form-label fw-semibold mb-0">Tanggal Mulai Periode (Hari I):</label>
-        <input type="date" name="periode_mulai" class="form-control" value="<?= htmlspecialchars($periode_mulai) ?>">
+        <label class="form-label fw-semibold mb-0"><i class="bi bi-calendar-date text-primary me-1"></i>Tanggal Mulai Periode (Hari I):</label>
+        <input type="date" name="periode_mulai" class="form-control" value="<?= htmlspecialchars($periode_mulai) ?>" onchange="this.form.submit()">
       </div>
       <div class="col-auto">
         <button type="submit" class="btn btn-outline-primary">
@@ -160,8 +162,10 @@ if ($stmtExisting !== false) {
       </div>
     </form>
 
-    <form method="post">
+    <form method="post" action="?id_pasien=<?= (int)$id_pasien ?>&tab=kegiatan&periode_mulai=<?= htmlspecialchars($periode_mulai) ?>">
       <input type="hidden" name="simpan_kegiatan_pasien" value="1">
+      <input type="hidden" name="id_pasien" value="<?= (int)$id_pasien ?>">
+      <input type="hidden" name="tab" value="kegiatan">
       <input type="hidden" name="periode_mulai" value="<?= htmlspecialchars($periode_mulai) ?>">
 
       <div class="table-responsive">

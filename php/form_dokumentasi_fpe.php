@@ -49,18 +49,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_dokumentasi_fp
     try {
         $id_jadwal          = (isset($_POST['id_jadwal']) && $_POST['id_jadwal'] !== '') ? (int)$_POST['id_jadwal'] : null;
         $asesmen             = trim($_POST['asesmen'] ?? '');
-        $hubungan            = trim($_POST['hubungan_dengan_pasien'] ?? '');
+        $hubungan_raw        = $_POST['hubungan_dengan_pasien'] ?? [];
         $hubungan_lainnya    = trim($_POST['hubungan_lainnya'] ?? '');
         $hasil_fpe           = trim($_POST['hasil_fpe'] ?? '');
         $kemampuan_pasien    = trim($_POST['kemampuan_pasien'] ?? '');
         $kemampuan_keluarga  = trim($_POST['kemampuan_keluarga'] ?? '');
 
-        if ($asesmen === '' || $hubungan === '') {
-            throw new Exception('Asesmen dan hubungan dengan pasien wajib diisi.');
+        if (!is_array($hubungan_raw)) {
+            $hubungan_raw = [$hubungan_raw];
         }
-        if (!array_key_exists($hubungan, $hubungan_options)) {
-            throw new Exception('Pilihan hubungan dengan pasien tidak valid.');
+
+        // Filter dan validasi pilihan hubungan keluarga
+        $selected_hubungan = [];
+        $has_lain_lain = false;
+        foreach ($hubungan_raw as $val) {
+            $val = trim((string)$val);
+            if (array_key_exists($val, $hubungan_options)) {
+                $selected_hubungan[] = $val;
+                if ($val === 'lain_lain') {
+                    $has_lain_lain = true;
+                }
+            }
         }
+
+        if ($asesmen === '') {
+            throw new Exception('Asesmen hasil wawancara wajib diisi.');
+        }
+        if (empty($selected_hubungan)) {
+            throw new Exception('Pilih setidaknya satu hubungan keluarga yang hadir dalam sesi FPE.');
+        }
+
+        $hubungan_str = implode(',', $selected_hubungan);
 
         $tsql = "
             INSERT INTO tbl_dokumentasi_fpe
@@ -72,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_dokumentasi_fp
             $id_jadwal,
             (int)$id_pasien,
             $asesmen,
-            $hubungan,
-            $hubungan === 'lain_lain' ? ($hubungan_lainnya !== '' ? $hubungan_lainnya : null) : null,
+            $hubungan_str,
+            $has_lain_lain && $hubungan_lainnya !== '' ? $hubungan_lainnya : null,
             $hasil_fpe !== '' ? $hasil_fpe : null,
             $kemampuan_pasien !== '' ? $kemampuan_pasien : null,
             $kemampuan_keluarga !== '' ? $kemampuan_keluarga : null,
@@ -149,35 +168,50 @@ if ($stmtRiwayat !== false) {
       </div>
     <?php endif; ?>
 
-    <form method="post">
+    <form method="post" onsubmit="return dokValidateForm()">
       <input type="hidden" name="simpan_dokumentasi_fpe" value="1">
       <div class="row g-3">
 
-        <div class="col-md-6">
+        <div class="col-md-12">
           <label class="form-label fw-semibold">Jadwal FPE Terkait (Opsional)</label>
           <select name="id_jadwal" class="form-select">
             <option value="">-- Tidak terhubung ke jadwal manapun --</option>
             <?php foreach ($daftar_jadwal_pasien as $j): ?>
               <option value="<?= (int)$j['id_jadwal'] ?>">
-                <?= htmlspecialchars($j['tanggal_pelaksanaan'] . ' ' . substr($j['jam_pelaksanaan'], 0, 5)) ?> WIB
+                [Jadwal #<?= (int)$j['id_jadwal'] ?>] <?= htmlspecialchars($j['tanggal_pelaksanaan'] . ' ' . substr($j['jam_pelaksanaan'], 0, 5)) ?> WIB
               </option>
             <?php endforeach; ?>
           </select>
+          <div class="form-text">Pilih jadwal FPE jika formulir ini merupakan bukti dokumentasi dari sesi yang telah dijadwalkan sebelumnya.</div>
         </div>
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Hubungan dengan Pasien <span class="text-danger">*</span></label>
-          <select name="hubungan_dengan_pasien" id="hubungan_dengan_pasien" class="form-select" required onchange="dokToggleLainnya()">
-            <option value="">-- Pilih Hubungan --</option>
-            <?php foreach ($hubungan_options as $val => $label): ?>
-              <option value="<?= $val ?>"><?= $label ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
+        <!-- Checkbox Pilihan Ganda (Multiple Choice) Hubungan Keluarga yang Hadir -->
+        <div class="col-12">
+          <label class="form-label fw-semibold d-block mb-2">
+            <i class="bi bi-people-fill text-primary me-1"></i> Hubungan dengan Pasien (Siapa Saja yang Hadir) <span class="text-danger">*</span>
+          </label>
+          <div class="p-3 bg-light rounded border">
+            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-5 g-2">
+              <?php foreach ($hubungan_options as $val => $label): ?>
+                <div class="col">
+                  <div class="form-check">
+                    <input class="form-check-input check-hubungan" type="checkbox" name="hubungan_dengan_pasien[]" 
+                           value="<?= $val ?>" id="hub_<?= $val ?>" 
+                           <?= $val === 'lain_lain' ? 'onchange="dokToggleLainnya()"' : '' ?>>
+                    <label class="form-check-label user-select-none" for="hub_<?= $val ?>">
+                      <?= $label ?>
+                    </label>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
 
-        <div class="col-12" id="dok_hubungan_lainnya_wrap" style="display:none;">
-          <label class="form-label fw-semibold">Sebutkan Hubungan Lainnya</label>
-          <input type="text" name="hubungan_lainnya" class="form-control" placeholder="Contoh: Tetangga, Wali Asuh">
+            <div class="mt-3 pt-2 border-top" id="dok_hubungan_lainnya_wrap" style="display:none;">
+              <label class="form-label small fw-semibold text-muted">Sebutkan Hubungan Lainnya:</label>
+              <input type="text" name="hubungan_lainnya" id="hubungan_lainnya_input" class="form-control form-control-sm" placeholder="Contoh: Paman, Bibi, Tetangga, Wali Asuh">
+            </div>
+          </div>
+          <div class="form-text">Centang satu atau lebih anggota keluarga yang hadir dalam sesi Psikoedukasi Keluarga.</div>
         </div>
 
         <div class="col-12">
@@ -212,8 +246,24 @@ if ($stmtRiwayat !== false) {
 
     <script>
     function dokToggleLainnya() {
-      var val = document.getElementById('hubungan_dengan_pasien').value;
-      document.getElementById('dok_hubungan_lainnya_wrap').style.display = (val === 'lain_lain') ? 'block' : 'none';
+      var chkLain = document.getElementById('hub_lain_lain');
+      var wrap = document.getElementById('dok_hubungan_lainnya_wrap');
+      if (chkLain && wrap) {
+        wrap.style.display = chkLain.checked ? 'block' : 'none';
+        if (!chkLain.checked) {
+          var inp = document.getElementById('hubungan_lainnya_input');
+          if (inp) inp.value = '';
+        }
+      }
+    }
+
+    function dokValidateForm() {
+      var checked = document.querySelectorAll('.check-hubungan:checked');
+      if (checked.length === 0) {
+        alert('Mohon pilih setidaknya satu hubungan keluarga yang hadir.');
+        return false;
+      }
+      return true;
     }
     </script>
 
@@ -233,22 +283,35 @@ if ($stmtRiwayat !== false) {
         <table class="table table-hover table-bordered align-middle">
           <thead class="table-light text-center">
             <tr>
-              <th style="width: 150px;">Tanggal Input</th>
-              <th style="width: 130px;">Hubungan</th>
+              <th style="width: 140px;">Tanggal Input</th>
+              <th style="width: 180px;">Keluarga Hadir</th>
               <th>Asesmen & Hasil FPE</th>
               <th>Kemampuan</th>
-              <th style="width: 140px;">PPA</th>
+              <th style="width: 130px;">PPA</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($daftar_dokumentasi as $d): ?>
             <tr>
               <td class="text-center small"><?= htmlspecialchars($d['created_at']) ?></td>
-              <td class="text-center fw-semibold">
-                <?= htmlspecialchars($hubungan_options[$d['hubungan_dengan_pasien']] ?? '-') ?>
-                <?php if (!empty($d['hubungan_lainnya'])): ?>
-                  <div class="small text-muted">(<?= htmlspecialchars($d['hubungan_lainnya']) ?>)</div>
-                <?php endif; ?>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  <?php 
+                    $rawHub = explode(',', $d['hubungan_dengan_pasien'] ?? '');
+                    foreach ($rawHub as $h): 
+                      $h = trim($h);
+                      if (empty($h)) continue;
+                      if ($h === 'lain_lain' && !empty($d['hubungan_lainnya'])):
+                  ?>
+                    <span class="badge bg-secondary text-wrap" title="<?= htmlspecialchars($d['hubungan_lainnya']) ?>">
+                      Lainnya: <?= htmlspecialchars($d['hubungan_lainnya']) ?>
+                    </span>
+                  <?php elseif (isset($hubungan_options[$h])): ?>
+                    <span class="badge bg-primary"><?= htmlspecialchars($hubungan_options[$h]) ?></span>
+                  <?php else: ?>
+                    <span class="badge bg-light text-dark border"><?= htmlspecialchars($h) ?></span>
+                  <?php endif; endforeach; ?>
+                </div>
               </td>
               <td>
                 <div class="fw-semibold small text-primary mb-1">Asesmen:</div>
@@ -279,3 +342,4 @@ if ($stmtRiwayat !== false) {
 
   </div>
 </div>
+

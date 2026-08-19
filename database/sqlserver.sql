@@ -85,8 +85,7 @@ BEGIN
         [id_jadwal]             INT NULL,
         [id_pasien]             INT NOT NULL,
         [asesmen]               NVARCHAR(MAX) NULL,
-        [hubungan_dengan_pasien] NVARCHAR(30) NULL 
-                                CONSTRAINT CHK_dok_hubungan CHECK ([hubungan_dengan_pasien] IN ('ayah','ibu','suami','istri','anak','kakak','adik','kakek','nenek','lain_lain')),
+        [hubungan_dengan_pasien] NVARCHAR(255) NULL, -- Multiple choice keluarga yang hadir (misal: 'ayah,ibu')
         [hubungan_lainnya]      NVARCHAR(100) NULL,
         [hasil_fpe]             NVARCHAR(MAX) NULL,
         [kemampuan_pasien]      NVARCHAR(MAX) NULL,
