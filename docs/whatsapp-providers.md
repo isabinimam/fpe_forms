@@ -1,42 +1,72 @@
 # PANDUAN PENGGANTIAN PROVIDER WHATSAPP
-## Mengalihkan antara Baileys (Pengujian) & WhatsApp Cloud API (Produksi)
+## Mengalihkan antara Baileys (Pengujian Lokal) & WhatsApp Cloud API (Produksi Resmi)
 
-Sistem menggunakan pola arsitektur **Provider Abstraction (`WhatsAppProvider`)** yang memisahkan seluruh logika antrean database dari modul pengiriman WhatsApp. Pengalihan dilakukan hanya melalui variabel lingkungan (*environment variables*).
+Sistem notifikasi WhatsApp dirancang dengan arsitektur **Strategy Pattern (`WhatsAppProvider`)** yang memisahkan seluruh logika antrean database dari modul gateway WhatsApp. Pengalihan antara mode pengujian dan mode produksi dilakukan **hanya melalui variabel lingkungan (`.env`) tanpa mengubah satu baris kode pun**.
 
 ---
 
-## 1. Mode Pengembangan / Pengujian Lokal (Default: Baileys)
+## 1. Mode Pengembangan & Pengujian Lokal (Default: Baileys)
 
-Mode ini menggunakan library Baileys untuk menghubungkan nomor WhatsApp pribadi atau kantor secara gratis menggunakan QR code.
+Mode ini menggunakan library socket Baileys untuk menghubungkan nomor WhatsApp pribadi atau operasional kantor secara gratis menggunakan pemindaian QR Code.
 
 ### Konfigurasi `.env` pada folder `node/`:
 ```env
+# Provider WhatsApp
 WHATSAPP_PROVIDER=baileys
+
+# Database SQL Server
+DB_SERVER=localhost
+DB_INSTANCE=SQLEXPRESS
+DB_DATABASE=form_pfe
+DB_TRUST_SERVER_CERTIFICATE=true
+
+# Polling & Antrean
+QUEUE_POLL_INTERVAL_MS=15000
+QUEUE_PROCESSING_TIMEOUT_MINUTES=10
+WA_MAX_ATTEMPTS=3
+HEALTH_PORT=3001
+TZ=Asia/Jakarta
 ```
 
 ### Karakteristik:
-- **Biaya**: Gratis.
-- **Autentikasi**: Scan QR Code di terminal satu kali (disimpan di `node/auth_info/`).
-- **Ideal untuk**: Uji coba internal, QA testing, dan demonstrasi ke manajemen.
+- **Biaya**: 100% Gratis.
+- **Autentikasi**: Pindai QR Code di terminal satu kali menggunakan menu *Perangkat Tertaut* di WhatsApp ponsel Anda.
+- **Penyimpanan Sesi**: Sesi disimpan secara terenkripsi di folder `node/auth_info/`.
+- **Ideal untuk**: Uji coba internal, QA testing, dan demonstrasi operasional.
 
 ---
 
-## 2. Mode Produksi Resmi (WhatsApp Cloud API)
+## 2. Mode Produksi Resmi (WhatsApp Cloud API Meta)
 
 Mode ini menggunakan API resmi WhatsApp Business Platform dari Meta / Facebook Graph API.
 
 ### Konfigurasi `.env` pada folder `node/`:
 ```env
+# Provider WhatsApp
 WHATSAPP_PROVIDER=cloud_api
 
+# Database SQL Server
+DB_SERVER=localhost
+DB_INSTANCE=SQLEXPRESS
+DB_DATABASE=nama_database_utama
+DB_TRUST_SERVER_CERTIFICATE=true
+
+# Konfigurasi WhatsApp Cloud API Meta
 WA_CLOUD_API_BASE_URL=https://graph.facebook.com
 WA_CLOUD_API_VERSION=v19.0
 WA_PHONE_NUMBER_ID=123456789012345
-WA_ACCESS_TOKEN=EAAG...your_permanent_meta_system_user_token...
+WA_ACCESS_TOKEN=EAAG...your_permanent_system_user_token_from_meta...
+
+# Polling & Antrean
+QUEUE_POLL_INTERVAL_MS=15000
+QUEUE_PROCESSING_TIMEOUT_MINUTES=10
+WA_MAX_ATTEMPTS=3
+HEALTH_PORT=3001
+TZ=Asia/Jakarta
 ```
 
 ### Karakteristik:
-- **Biaya**: Mengikuti tarif resmi percakapan utilitas Meta (Utility Conversation).
-- **Keandalan**: SLA 99.9% dari server Meta, tanpa perlu scan QR atau menjaga koneksi socket tetap hidup.
-- **Kapasitas**: Skalabilitas tinggi hingga ribuan pesan per menit.
-- **Tanpa Perubahan Kode**: Kode antrean di SQL Server dan PHP tetap sama persis 100%.
+- **Keandalan Tinggi**: Server-to-server HTTP request langsung ke Meta dengan SLA 99.9%.
+- **Tanpa Scan QR**: Tidak memerlukan ponsel fisik yang harus selalu terhubung ke internet.
+- **Skalabilitas**: Mampu mengirimkan puluhan hingga ratusan notifikasi per detik tanpa resiko koneksi terputus.
+- **Portabilitas Penuh**: Skema tabel antrean `tbl_wa_queue` dan seluruh kode PHP di aplikasi utama tetap berjalan identik 100%.
