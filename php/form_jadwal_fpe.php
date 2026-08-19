@@ -77,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
             $slot_waktu            = trim($_POST['slot_waktu'] ?? '');
             $nomor_wa_keluarga     = trim($_POST['nomor_wa_keluarga'] ?? '');
             $nama_keluarga         = trim($_POST['nama_keluarga'] ?? '');
-            $kirimManualLangsung   = isset($_POST['kirim_manual_langsung']) && $_POST['kirim_manual_langsung'] == '1';
 
             // Validasi kolom wajib
             if ($tanggal === '' || $jam === '' || $metode === '' || $slot_waktu === '' || $nomor_wa_keluarga === '') {
@@ -90,16 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
                 throw new Exception('Nomor WhatsApp keluarga tidak valid. Masukkan nomor ponsel Indonesia yang benar (contoh: 081234567890).');
             }
 
-            // 1. Hitung Waktu Pengiriman Notifikasi
-            $leadDays = WA_NOTIFICATION_LEAD_DAYS;
-            $notifTime = WA_NOTIFICATION_TIME;
-            if ($kirimManualLangsung) {
-                $scheduledAt = (new DateTime('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d H:i:s');
-                $tipeNotif   = 'FPE_MANUAL';
-            } else {
-                $scheduledAt = calculateScheduledAt($tanggal, $leadDays, $notifTime);
-                $tipeNotif   = 'FPE_REMINDER';
-            }
+            // 1. Hitung Waktu Pengiriman Notifikasi (H-1 pukul 09:00 WIB, otomatis due-now jika kurang dari 24 jam / sudah lewat)
+            $leadDays    = WA_NOTIFICATION_LEAD_DAYS;
+            $notifTime   = WA_NOTIFICATION_TIME;
+            $scheduledAt = calculateScheduledAt($tanggal, $leadDays, $notifTime);
+            $tipeNotif   = 'FPE_REMINDER';
 
             // 2. Susun Teks Pesan Pengingat
             $pesanWa = buildFpeReminderMessage([
@@ -153,8 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
             sqlsrv_commit($conn);
 
             $pesan = "Jadwal FPE berhasil disimpan.";
-            if ($kirimManualLangsung) {
-                $notifInfo = "<span class='badge bg-primary me-1'><i class='bi bi-send-fill me-1'></i>Kirim Manual</span> Notifikasi WhatsApp langsung dimasukkan ke antrean kirim saat ini ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>. Pengingat otomatis H-1 tidak akan dikirim ganda.";
+            $isImmediate = strtotime($scheduledAt) <= time() + 60;
+            if ($isImmediate) {
+                $notifInfo = "<span class='badge bg-success me-1'><i class='bi bi-lightning-charge-fill me-1'></i>Kirim Segera</span> Notifikasi WhatsApp otomatis masuk antrean kirim saat ini ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong> karena jadwal berlangsung hari ini / H-1.";
             } else {
                 $notifInfo = "Notifikasi WhatsApp otomatis dijadwalkan untuk dikirim pada: <strong>" . htmlspecialchars($scheduledAt) . " WIB</strong> (H-{$leadDays}) ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>.";
             }
@@ -266,7 +261,9 @@ $tsqlRiwayat = "
         COALESCE(q.attempts, 1) AS wa_attempts,
         COALESCE(q.last_error, j.log_error) AS wa_last_error
     FROM tbl_jadwal_fpe j
-    LEFT JOIN tbl_wa_queue q ON j.id_jadwal = q.id_jadwal AND q.tipe_notifikasi = 'FPE_REMINDER'
+    LEFT JOIN tbl_wa_queue q ON q.id = (
+        SELECT TOP 1 id FROM tbl_wa_queue WHERE id_jadwal = j.id_jadwal ORDER BY id DESC
+    )
     WHERE j.id_pasien = ?
     ORDER BY j.tanggal_pelaksanaan DESC, j.jam_pelaksanaan DESC
 ";
@@ -365,20 +362,14 @@ if ($stmtRiwayat !== false) {
         </div>
 
         <!-- Kolom Khusus Zoom (Ditampilkan jika metode = zoom_meeting) -->
-        <div id="fpe_zoom_id" class="col-md-6" style="display:none;">
-          <label class="form-label fw-semibold">Meeting ID Zoom</label>
-          <input type="text" name="meeting_id" class="form-control" placeholder="Contoh: 838 1051 3404">
+        <div id="fpe_zoom_id" class="col-md-3" style="display:none;">
+          <label class="form-label fw-semibold"><i class="bi bi-camera-video text-primary me-1"></i> Meeting ID Zoom</label>
+          <input type="text" name="meeting_id" id="input_meeting_id" class="form-control" placeholder="Contoh: 838 1051 3404">
         </div>
 
-        <!-- Opsi Kirim Langsung Sekarang (Manual) -->
-        <div class="col-12">
-          <div class="form-check form-switch p-3 bg-light rounded border">
-            <input class="form-check-input ms-0 me-2" type="checkbox" name="kirim_manual_langsung" id="kirim_manual_langsung" value="1">
-            <label class="form-check-label fw-semibold text-primary" for="kirim_manual_langsung">
-              <i class="bi bi-send-check-fill me-1"></i> Langsung Kirim Notifikasi WhatsApp Sekarang (Manual)
-            </label>
-            <div class="form-text text-muted ps-4">Centang opsi ini jika ingin notifikasi WhatsApp langsung dikirim detik ini juga saat jadwal disimpan (pengingat otomatis H-1 tidak akan dikirim ganda).</div>
-          </div>
+        <div id="fpe_zoom_pass" class="col-md-3" style="display:none;">
+          <label class="form-label fw-semibold"><i class="bi bi-key-fill text-warning me-1"></i> Passcode Zoom</label>
+          <input type="text" name="passcode" id="input_passcode" class="form-control" placeholder="Contoh: 123456">
         </div>
 
       </div>
@@ -444,9 +435,12 @@ if ($stmtRiwayat !== false) {
               <td class="text-center"><?= htmlspecialchars($j['jam_pelaksanaan']) ?></td>
               <td>
                 <?php if ($j['metode'] === 'zoom_meeting'): ?>
-                  <span class="badge bg-primary"><i class="bi bi-camera-video me-1"></i>Zoom</span>
+                  <span class="badge bg-primary"><i class="bi bi-camera-video me-1"></i>Zoom Meeting</span>
                   <?php if (!empty($j['meeting_id'])): ?>
-                    <div class="small text-muted mt-1">ID: <?= htmlspecialchars($j['meeting_id']) ?></div>
+                    <div class="small text-dark mt-1"><strong>ID:</strong> <?= htmlspecialchars($j['meeting_id']) ?></div>
+                  <?php endif; ?>
+                  <?php if (!empty($j['passcode'])): ?>
+                    <div class="small text-muted"><strong>Pass:</strong> <?= htmlspecialchars($j['passcode']) ?></div>
                   <?php endif; ?>
                 <?php else: ?>
                   <span class="badge bg-success"><i class="bi bi-whatsapp me-1"></i>Video Call WA</span>

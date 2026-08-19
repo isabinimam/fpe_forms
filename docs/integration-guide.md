@@ -248,13 +248,12 @@ ALTER TABLE [dbo].[tabel_pasien_anda] ADD [tanggal_lahir] DATE NULL;
 ## 4. Deskripsi Fitur Setiap Form
 
 ### 4.1 Form 1: Penjadwalan FPE & WhatsApp (`form_jadwal_fpe.php`)
-- **Input**: Tanggal, Jam, Metode (Video Call WA / Zoom Meeting), Slot Waktu, Nomor WhatsApp Keluarga, Nama Keluarga, Pengingat Otomatis H-N hari, Opsi Kirim Manual Langsung.
-- **Fitur Otomatis**: Saat disimpan, pengingat WhatsApp otomatis dijadwalkan (default H-1 pukul 09:00 WIB).
-- **Fitur Manual**: Toggle "Langsung Kirim Notifikasi WhatsApp Sekarang (Manual)".
-- **Tabel Riwayat**: Menampilkan riwayat jadwal dengan status pengiriman WA, waktu terkirim, dan kolom **Aksi** berisi tombol:
-  - **"Kirim Manual Sekarang"**: Mengirim notifikasi seketika.
-  - **"Kirim Ulang"**: Untuk jadwal yang sudah pernah terkirim.
-- **Mekanisme Anti Pesan Ganda**: Saat pesan dikirim manual, seluruh pengingat otomatis pending untuk jadwal yang sama otomatis dibatalkan (`status = 'cancelled'`) dengan keterangan `'Otomatis gugur karena telah dikirim secara manual'`.
+- **Input**: Tanggal, Jam, Metode (Video Call WA / Zoom Meeting), **Meeting ID & Passcode Zoom** (tampil dinamis jika memilih metode Zoom Meeting), Slot Waktu, Nomor WhatsApp Keluarga, Nama Keluarga.
+- **Fitur Otomatisasi Cerdas**: Saat disimpan, sistem secara otomatis menghitung jadwal pengingat (default H-1 pukul 09:00 WIB). Jika jadwal dibuat kurang dari 24 jam sebelum pelaksanaan atau hari yang sama, sistem otomatis mengaturnya untuk **langsung dikirim seketika (*due-now*)**.
+- **Tabel Riwayat & Tombol Kirim Manual**: Menampilkan riwayat jadwal (termasuk Meeting ID & Passcode untuk sesi Zoom), status pengiriman WA, waktu terkirim, dan kolom **Aksi** berisi tombol:
+  - **"Kirim Manual"**: Mengirim notifikasi seketika jika petugas ingin mendahului jadwal pengingat H-1.
+  - **"Kirim Ulang"**: Untuk jadwal yang sudah pernah terkirim jika keluarga meminta pengiriman ulang.
+- **Mekanisme Anti Pesan Ganda**: Saat pesan dikirim manual melalui tombol aksi di tabel, seluruh pengingat otomatis pending untuk jadwal yang sama otomatis dibatalkan (`status = 'cancelled'`) dengan keterangan `'Otomatis gugur karena telah dikirim secara manual'`.
 - **Template Pesan Resmi**: Pesan WhatsApp menggunakan template resmi RSKD Duren Sawit dengan format terstruktur (emoji, garis pembatas, nama hari Indonesia, catatan penting).
 
 ### 4.2 Form 2: Dokumentasi FPE (`form_dokumentasi_fpe.php`)

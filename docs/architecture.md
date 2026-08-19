@@ -71,7 +71,7 @@
 ## 2. Fitur Arsitektur Utama
 
 ### A. Pengiriman Manual & Pencegahan Pesan Ganda (*De-duplication & Invalidation*)
-- Saat petugas memilih untuk mengirim pesan secara manual (melalui toggle formulir atau tombol **"Kirim Manual Sekarang"** di tabel riwayat):
+- Saat petugas memilih untuk mengirim pesan secara manual (melalui tombol **"Kirim Manual"** di tabel riwayat):
   1. Antrean diubah menjadi tipe `FPE_MANUAL` dengan waktu jatuh tempo saat itu juga (*due-now*).
   2. Seluruh antrean pengingat otomatis terjadwal yang masih berstatus `pending` untuk sesi tersebut **langsung digugurkan (*status = 'cancelled'*)** dengan catatan log: *"Otomatis gugur karena telah dikirim secara manual"*.
   3. Setelah pesan terkirim oleh worker, status pada `tbl_jadwal_fpe.status_kirim_wa` disinkronkan ke `'sent'` sehingga tidak ada duplikasi pengiriman pesan ke keluarga pasien.
