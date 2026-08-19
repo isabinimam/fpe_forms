@@ -1,27 +1,58 @@
-# Environment files
+# =====================================================================
+# GITIGNORE - RSKD DUREN SAWIT (FPE FORMS & WA WORKER)
+# =====================================================================
+
+# 1. Environment & Credential Files
 .env
 .env.local
 .env.*.local
-
-# Baileys session and credentials
-node/auth_info/
-auth_info/
+node/.env
 *.session
 
-# Node modules
+# 2. WhatsApp Baileys Auth Session & Credentials
+node/auth_info/
+auth_info/
+
+# 3. Node Dependencies & Package Manager Logs
 node_modules/
 node/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Logs & temporary files
+# 4. Berkas Standalone Test Harness (Tidak Digunakan untuk Integrasi)
+# Sesuai docs/integration-guide.md: hanya digunakan untuk pengujian lokal
+php/index.php
+php/config/
+form_jadwal_fpe.php
+form_dokumentasi_fpe.php
+form_kegiatan_pasien.php
+form_skrining_bunuh_diri.php
+
+# 5. Berkas Perencanaan, Prompt AI, & Skema Legacy (Tidak untuk Integrasi)
+implementation_plan.md
+remediation_plan.md
+Master AI Implementation Prompt — FPE Schedule & Automated WhatsApp Notification System.md
+schema.sql
+
+# 6. Temporary Test Scripts & Logs
+test_*.php
+inspect_*.php
+cleanup_*.php
+update_*.php
+readd_*.php
+migrate_*.php
+fix_*.php
 logs/
 *.log
 scratch/
 tmp/
 temp/
 
-# OS specific files
+# 7. OS & IDE Specific Files
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak

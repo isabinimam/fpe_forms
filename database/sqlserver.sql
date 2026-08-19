@@ -4,9 +4,10 @@
 -- Database target: form_pfe
 -- =====================================================================
 
--- 0. TABEL DUMMY PASIEN (HANYA UNTUK TESTING STANDALONE)
+-- 0. TABEL DUMMY PASIEN (HANYA UNTUK TESTING STANDALONE - DIKOMENTARI)
 -- ⚠️ Catatan Portabilitas: Jangan jalankan bagian ini saat integrasi ke main project
 -- karena main project sudah memiliki tabel pasien sendiri.
+/*
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[tbl_pasien]') AND type in (N'U'))
 BEGIN
     CREATE TABLE [dbo].[tbl_pasien] (
@@ -25,6 +26,7 @@ BEGIN
     SET IDENTITY_INSERT [dbo].[tbl_pasien] OFF;
 END;
 GO
+*/
 
 -- 1. TABEL JADWAL FPE
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[tbl_jadwal_fpe]') AND type in (N'U'))
