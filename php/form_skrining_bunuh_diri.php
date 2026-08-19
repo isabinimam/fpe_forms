@@ -82,9 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
         $p2               = trim($_POST['pertanyaan_2'] ?? '');
         $p3               = trim($_POST['pertanyaan_3'] ?? '');
         $p3a              = trim($_POST['pertanyaan_3a'] ?? '');
+        $lokasi           = trim($_POST['lokasi'] ?? '');
 
-        if ($tanggal_datang === '' || $jam_datang === '' || $status_pasien === '' || $rujukan === '' || $disabilitas === '') {
-            throw new Exception('Mohon lengkapi semua kolom wajib (tanggal, jam, status pasien, rujukan, disabilitas).');
+        if ($tanggal_datang === '' || $jam_datang === '' || $status_pasien === '' || $rujukan === '' || $disabilitas === '' || $lokasi === '') {
+            throw new Exception('Mohon lengkapi semua kolom wajib (tanggal, jam, status pasien, rujukan, disabilitas, asal pasien).');
         }
 
         $hasil_skoring = hitungSkoringBunuhDiri($p1, $p2, $p3, $p3a ?: null);
@@ -92,10 +93,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
         $tsql = "
             INSERT INTO tbl_skrining_risiko_bunuh_diri
                 (id_pasien, tanggal_datang, jam_datang, status_pasien, rujukan, rujukan_dari, disabilitas, diagnosis, keluhan_saat_ini,
-                 pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, nama_petugas_skrining, created_at)
+                 pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, lokasi, nama_petugas_skrining, created_at)
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?, ?, ?, ?, ?, ?, SYSDATETIME())
+                 ?, ?, ?, ?, ?, ?, ?, SYSDATETIME())
         ";
         $params = [
             (int)$id_pasien,
@@ -112,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
             $p3 ?: null,
             ($p3 === 'ya' && $p3a !== '') ? $p3a : null,
             $hasil_skoring,
+            $lokasi,
             $nama_petugas,
         ];
 
@@ -134,7 +136,7 @@ $tsqlRiwayat = "
            CONVERT(VARCHAR(10), tanggal_datang, 120) AS tanggal_datang, 
            CONVERT(VARCHAR(5), jam_datang, 108) AS jam_datang, 
            status_pasien, rujukan, rujukan_dari, disabilitas, diagnosis, keluhan_saat_ini,
-           pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, nama_petugas_skrining,
+           pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, lokasi, nama_petugas_skrining,
            CONVERT(VARCHAR(19), created_at, 120) AS created_at
     FROM tbl_skrining_risiko_bunuh_diri
     WHERE id_pasien = ?
@@ -302,6 +304,34 @@ if ($stmtRiwayat !== false) {
         </div>
       </div>
 
+      <!-- Asal Pasien (IGD / Poli) - Diposisikan di Bawah Sebelum Submit -->
+      <div class="p-3 bg-light rounded border mb-4">
+        <div class="row align-items-center">
+          <div class="col-md-4">
+            <label class="form-label fw-bold mb-0">
+              <i class="bi bi-geo-alt-fill text-primary me-1"></i> Asal Pasien (Lokasi Skrining) <span class="text-danger">*</span>
+            </label>
+            <div class="text-muted small">Pilih unit asal saat skrining dilakukan</div>
+          </div>
+          <div class="col-md-8">
+            <div class="d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="lokasi" id="lokasi_poli" value="poli" required checked>
+                <label class="form-check-label fw-semibold" for="lokasi_poli">
+                  <span class="badge bg-success-subtle text-success border border-success me-1 px-2 py-1">Poli</span> Poliklinik
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="lokasi" id="lokasi_igd" value="igd" required>
+                <label class="form-check-label fw-semibold" for="lokasi_igd">
+                  <span class="badge bg-danger-subtle text-danger border border-danger me-1 px-2 py-1">IGD</span> Instalasi Gawat Darurat
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="d-flex justify-content-between align-items-center mt-4 pt-2 border-top">
         <span class="text-muted small">Petugas Skrining: <strong><?= htmlspecialchars($nama_petugas) ?></strong></span>
         <button type="submit" name="simpan_skrining" class="btn btn-primary px-4 py-2 fw-semibold">
@@ -338,11 +368,12 @@ if ($stmtRiwayat !== false) {
         <table class="table table-hover table-bordered align-middle">
           <thead class="table-light text-center">
             <tr>
-              <th style="width: 140px;">Tanggal & Jam</th>
+              <th style="width: 130px;">Tanggal & Jam</th>
+              <th style="width: 100px;">Asal Pasien</th>
               <th style="width: 160px;">Hasil Skoring</th>
-              <th style="width: 140px;">Status / Rujukan</th>
+              <th style="width: 130px;">Status / Rujukan</th>
               <th>Diagnosis / Keluhan</th>
-              <th style="width: 140px;">Petugas</th>
+              <th style="width: 130px;">Petugas</th>
             </tr>
           </thead>
           <tbody>
@@ -351,6 +382,15 @@ if ($stmtRiwayat !== false) {
               <td class="text-center small">
                 <div class="fw-semibold"><?= htmlspecialchars($s['tanggal_datang']) ?></div>
                 <div class="text-muted"><?= htmlspecialchars($s['jam_datang']) ?> WIB</div>
+              </td>
+              <td class="text-center fw-semibold">
+                <?php if (($s['lokasi'] ?? '') === 'poli'): ?>
+                  <span class="badge bg-success">Poli</span>
+                <?php elseif (($s['lokasi'] ?? '') === 'igd'): ?>
+                  <span class="badge bg-danger">IGD</span>
+                <?php else: ?>
+                  <span class="badge bg-secondary"><?= strtoupper(htmlspecialchars($s['lokasi'] ?? '-')) ?></span>
+                <?php endif; ?>
               </td>
               <td class="text-center">
                 <?php if (strpos($s['hasil_skoring'] ?? '', 'Risiko Bunuh Diri') !== false): ?>

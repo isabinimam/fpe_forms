@@ -163,6 +163,7 @@ BEGIN
         [pertanyaan_3]          NVARCHAR(20) NULL CONSTRAINT CHK_skr_p3 CHECK ([pertanyaan_3] IN ('ya','tidak','menyangkal','tidak_menjawab')),
         [pertanyaan_3a]         NVARCHAR(30) NULL CONSTRAINT CHK_skr_p3a CHECK ([pertanyaan_3a] IN ('dalam_24jam','dalam_bulan_terakhir','1_6bulan','lebih_6bulan','menyangkal','tidak_menjawab')),
         [hasil_skoring]         NVARCHAR(100) NULL,
+        [lokasi]                NVARCHAR(20) NOT NULL DEFAULT 'poli' CONSTRAINT CHK_skr_lokasi CHECK ([lokasi] IN ('igd', 'poli')),
         [nama_petugas_skrining] NVARCHAR(100) NULL,
         [created_at]            DATETIME2 NOT NULL DEFAULT SYSDATETIME()
     );
