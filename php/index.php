@@ -13,8 +13,8 @@ $conn = require __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/wa_queue.php';
 
-// Ambil daftar pasien dari tabel dummy tbl_pasien (hanya id_pasien dan nama_pasien)
-$tsqlPasien = "SELECT id_pasien, nama_pasien FROM tbl_pasien ORDER BY id_pasien ASC";
+// Ambil daftar pasien dari tabel dummy tbl_pasien
+$tsqlPasien = "SELECT id_pasien, nama_pasien, CONVERT(VARCHAR(10), tanggal_lahir, 120) AS tanggal_lahir FROM tbl_pasien ORDER BY id_pasien ASC";
 $stmtPasien = sqlsrv_query($conn, $tsqlPasien);
 $daftarPasien = [];
 if ($stmtPasien !== false) {
@@ -213,18 +213,22 @@ if ($stmtQAll !== false) {
             </select>
           </form>
         </div>
-        <div class="col-md-5">
+        <div class="col-md-6">
           <div class="d-flex flex-wrap gap-2 text-muted small align-items-center">
             <div><strong>Pasien:</strong> <span class="text-dark fw-semibold"><?= htmlspecialchars($pasienAktif['nama_pasien'] ?? "Pasien #$id_pasien") ?></span></div>
+            <?php if (!empty($pasienAktif['tanggal_lahir'])): 
+              $umurPasienAktif = hitungUmurLengkap($pasienAktif['tanggal_lahir']);
+            ?>
+              <div>&bull;</div>
+              <div><strong>Lahir:</strong> <?= htmlspecialchars(formatTanggalIndo($pasienAktif['tanggal_lahir'], false)) ?> <span class="badge bg-primary-subtle text-primary border ms-1"><?= htmlspecialchars($umurPasienAktif['teks']) ?></span></div>
+            <?php endif; ?>
             <?php if (!empty($kontakTerakhir['nama_keluarga']) || !empty($kontakTerakhir['nomor_wa'])): ?>
               <div>&bull;</div>
-              <div><strong>Kontak FPE Terakhir:</strong> <span class="text-dark"><?= htmlspecialchars($kontakTerakhir['nama_keluarga'] ?? '-') ?></span></div>
-              <div>&bull;</div>
-              <div><strong>WA:</strong> <span class="text-dark">+<?= htmlspecialchars($kontakTerakhir['nomor_wa'] ?? '-') ?></span></div>
+              <div><strong>Kontak FPE:</strong> <span class="text-dark"><?= htmlspecialchars($kontakTerakhir['nama_keluarga'] ?? '-') ?> (+<?= htmlspecialchars($kontakTerakhir['nomor_wa'] ?? '-') ?>)</span></div>
             <?php endif; ?>
           </div>
         </div>
-        <div class="col-md-3 text-end">
+        <div class="col-md-2 text-end">
           <span class="badge bg-light text-secondary border px-2 py-1">Petugas: <?= htmlspecialchars($nama_petugas) ?></span>
         </div>
       </div>

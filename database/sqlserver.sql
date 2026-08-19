@@ -10,17 +10,18 @@
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[tbl_pasien]') AND type in (N'U'))
 BEGIN
     CREATE TABLE [dbo].[tbl_pasien] (
-        [id_pasien]   INT IDENTITY(1,1) PRIMARY KEY,
-        [nama_pasien] NVARCHAR(100) NOT NULL,
-        [created_at]  DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+        [id_pasien]     INT IDENTITY(1,1) PRIMARY KEY,
+        [nama_pasien]   NVARCHAR(100) NOT NULL,
+        [tanggal_lahir] DATE NULL,
+        [created_at]    DATETIME2 NOT NULL DEFAULT SYSDATETIME()
     );
 
     SET IDENTITY_INSERT [dbo].[tbl_pasien] ON;
-    INSERT INTO [dbo].[tbl_pasien] ([id_pasien], [nama_pasien])
+    INSERT INTO [dbo].[tbl_pasien] ([id_pasien], [nama_pasien], [tanggal_lahir])
     VALUES 
-        (123, N'Ny. Aisyah (Pasien Rawat Inap)'),
-        (1, N'Budi Santoso (Test Pasien)'),
-        (2, N'Dewi Sartika (Test Pasien)');
+        (123, N'Ny. Aisyah (Pasien Rawat Inap)', '1985-04-12'),
+        (1, N'Budi Santoso (Test Pasien)', '1992-08-15'),
+        (2, N'Dewi Sartika (Test Pasien)', '1998-11-20');
     SET IDENTITY_INSERT [dbo].[tbl_pasien] OFF;
 END;
 GO
@@ -162,7 +163,6 @@ BEGIN
         [pertanyaan_3]          NVARCHAR(20) NULL CONSTRAINT CHK_skr_p3 CHECK ([pertanyaan_3] IN ('ya','tidak','menyangkal','tidak_menjawab')),
         [pertanyaan_3a]         NVARCHAR(30) NULL CONSTRAINT CHK_skr_p3a CHECK ([pertanyaan_3a] IN ('dalam_24jam','dalam_bulan_terakhir','1_6bulan','lebih_6bulan','menyangkal','tidak_menjawab')),
         [hasil_skoring]         NVARCHAR(100) NULL,
-        [lokasi]                NVARCHAR(20) NOT NULL CONSTRAINT CHK_skr_lokasi CHECK ([lokasi] IN ('igd', 'poli')),
         [nama_petugas_skrining] NVARCHAR(100) NULL,
         [created_at]            DATETIME2 NOT NULL DEFAULT SYSDATETIME()
     );

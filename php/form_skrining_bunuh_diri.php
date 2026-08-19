@@ -32,8 +32,24 @@ if (!isset($id_pasien)) {
 }
 $nama_petugas = $nama_petugas ?? 'Petugas';
 
+require_once __DIR__ . '/includes/helpers.php';
+
 $pesan = '';
 $error = '';
+
+// Ambil info nama pasien & tanggal lahir untuk kalkulasi umur akurat
+$namaPasienSkrining = "Pasien #$id_pasien";
+$tanggalLahirPasien = null;
+$tsqlP = "SELECT nama_pasien, CONVERT(VARCHAR(10), tanggal_lahir, 120) AS tanggal_lahir FROM tbl_pasien WHERE id_pasien = ?";
+$stmtP = sqlsrv_query($conn, $tsqlP, [(int)$id_pasien]);
+if ($stmtP !== false) {
+    if ($rowP = sqlsrv_fetch_array($stmtP, SQLSRV_FETCH_ASSOC)) {
+        $namaPasienSkrining = $rowP['nama_pasien'] ?? $namaPasienSkrining;
+        $tanggalLahirPasien = $rowP['tanggal_lahir'] ?? null;
+    }
+    sqlsrv_free_stmt($stmtP);
+}
+$infoUmur = hitungUmurLengkap($tanggalLahirPasien);
 
 if (!function_exists('hitungSkoringBunuhDiri')) {
     function hitungSkoringBunuhDiri(string $p1, string $p2, string $p3, ?string $p3a): string
@@ -66,10 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
         $p2               = trim($_POST['pertanyaan_2'] ?? '');
         $p3               = trim($_POST['pertanyaan_3'] ?? '');
         $p3a              = trim($_POST['pertanyaan_3a'] ?? '');
-        $lokasi           = trim($_POST['lokasi'] ?? '');
 
-        if ($tanggal_datang === '' || $jam_datang === '' || $status_pasien === '' || $rujukan === '' || $disabilitas === '' || $lokasi === '') {
-            throw new Exception('Mohon lengkapi semua kolom wajib (tanggal, jam, status pasien, rujukan, disabilitas, lokasi).');
+        if ($tanggal_datang === '' || $jam_datang === '' || $status_pasien === '' || $rujukan === '' || $disabilitas === '') {
+            throw new Exception('Mohon lengkapi semua kolom wajib (tanggal, jam, status pasien, rujukan, disabilitas).');
         }
 
         $hasil_skoring = hitungSkoringBunuhDiri($p1, $p2, $p3, $p3a ?: null);
@@ -77,10 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
         $tsql = "
             INSERT INTO tbl_skrining_risiko_bunuh_diri
                 (id_pasien, tanggal_datang, jam_datang, status_pasien, rujukan, rujukan_dari, disabilitas, diagnosis, keluhan_saat_ini,
-                 pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, lokasi, nama_petugas_skrining, created_at)
+                 pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, nama_petugas_skrining, created_at)
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?, ?, ?, ?, ?, ?, ?, SYSDATETIME())
+                 ?, ?, ?, ?, ?, ?, SYSDATETIME())
         ";
         $params = [
             (int)$id_pasien,
@@ -97,7 +112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_skrining'])) {
             $p3 ?: null,
             ($p3 === 'ya' && $p3a !== '') ? $p3a : null,
             $hasil_skoring,
-            $lokasi,
             $nama_petugas,
         ];
 
@@ -120,7 +134,7 @@ $tsqlRiwayat = "
            CONVERT(VARCHAR(10), tanggal_datang, 120) AS tanggal_datang, 
            CONVERT(VARCHAR(5), jam_datang, 108) AS jam_datang, 
            status_pasien, rujukan, rujukan_dari, disabilitas, diagnosis, keluhan_saat_ini,
-           pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, lokasi, nama_petugas_skrining,
+           pertanyaan_1, pertanyaan_2, pertanyaan_3, pertanyaan_3a, hasil_skoring, nama_petugas_skrining,
            CONVERT(VARCHAR(19), created_at, 120) AS created_at
     FROM tbl_skrining_risiko_bunuh_diri
     WHERE id_pasien = ?
@@ -142,6 +156,30 @@ if ($stmtRiwayat !== false) {
     <span class="badge bg-light text-primary px-3 py-2">ID Pasien: <?= htmlspecialchars((string)$id_pasien) ?></span>
   </div>
   <div class="card-body p-4">
+
+    <!-- Panel Informasi Pasien & Umur Lengkap -->
+    <div class="card bg-light border-0 shadow-sm mb-4">
+      <div class="card-body p-3">
+        <div class="row align-items-center g-3">
+          <div class="col-md-4">
+            <div class="small text-muted mb-1">Nama Pasien:</div>
+            <div class="fw-bold text-dark fs-6"><i class="bi bi-person-circle text-primary me-1"></i> <?= htmlspecialchars($namaPasienSkrining) ?></div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted mb-1">Tanggal Lahir:</div>
+            <div class="fw-semibold text-dark">
+              <i class="bi bi-calendar-heart text-danger me-1"></i> <?= !empty($tanggalLahirPasien) ? htmlspecialchars(formatTanggalIndo($tanggalLahirPasien, false)) : '<span class="text-muted fst-italic">Belum dicatat</span>' ?>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted mb-1">Umur Pasien (Tahun, Bulan, Hari):</div>
+            <div class="badge bg-primary fs-6 px-3 py-2 text-wrap shadow-sm">
+              <i class="bi bi-hourglass-split me-1"></i> <?= htmlspecialchars($infoUmur['teks']) ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <?php if ($pesan !== ''): ?>
       <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
@@ -198,17 +236,9 @@ if ($stmtRiwayat !== false) {
           </select>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-12">
           <label class="form-label fw-semibold">Diagnosis Medis/Psikiatri</label>
           <input type="text" name="diagnosis" class="form-control" placeholder="Contoh: Skizofrenia Paranoid (F20.0)">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Lokasi Pemeriksaan <span class="text-danger">*</span></label>
-          <select name="lokasi" class="form-select" required>
-            <option value="">-- Pilih Lokasi --</option>
-            <option value="igd">IGD</option>
-            <option value="poli">Poliklinik</option>
-          </select>
         </div>
 
         <div class="col-12">
@@ -310,7 +340,7 @@ if ($stmtRiwayat !== false) {
             <tr>
               <th style="width: 140px;">Tanggal & Jam</th>
               <th style="width: 160px;">Hasil Skoring</th>
-              <th>Lokasi</th>
+              <th style="width: 140px;">Status / Rujukan</th>
               <th>Diagnosis / Keluhan</th>
               <th style="width: 140px;">Petugas</th>
             </tr>
@@ -331,7 +361,14 @@ if ($stmtRiwayat !== false) {
                   <span class="badge bg-success px-2 py-1"><?= htmlspecialchars($s['hasil_skoring'] ?? 'Tidak Berisiko') ?></span>
                 <?php endif; ?>
               </td>
-              <td class="text-center fw-semibold"><?= strtoupper(htmlspecialchars($s['lokasi'])) ?></td>
+              <td class="text-center small">
+                <span class="badge bg-secondary mb-1"><?= ucfirst(htmlspecialchars($s['status_pasien'])) ?></span>
+                <?php if ($s['rujukan'] === 'ya'): ?>
+                  <div class="text-primary fw-medium">Rujukan: <?= htmlspecialchars($s['rujukan_dari'] ?? 'Ya') ?></div>
+                <?php else: ?>
+                  <div class="text-muted">Non-Rujukan</div>
+                <?php endif; ?>
+              </td>
               <td class="small">
                 <?php if (!empty($s['diagnosis'])): ?>
                   <div><strong>Diagnosis:</strong> <?= htmlspecialchars($s['diagnosis']) ?></div>

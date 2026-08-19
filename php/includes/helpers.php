@@ -144,3 +144,53 @@ function formatTanggalIndo($date, bool $withDay = true): string {
     }
     return "{$hari} {$bulan} {$tahun}";
 }
+
+/**
+ * Hitung umur lengkap secara presisi (Tahun, Bulan, Hari)
+ *
+ * @param string|DateTimeInterface|null $tanggalLahir
+ * @param string|DateTimeInterface|null $tanggalRujukan (default: sekarang)
+ * @return array ['tahun' => int, 'bulan' => int, 'hari' => int, 'teks' => string]
+ */
+function hitungUmurLengkap($tanggalLahir, $tanggalRujukan = null): array {
+    if (empty($tanggalLahir)) {
+        return [
+            'tahun' => 0,
+            'bulan' => 0,
+            'hari'  => 0,
+            'teks'  => 'Umur tidak diketahui'
+        ];
+    }
+
+    try {
+        $dtLahir = ($tanggalLahir instanceof DateTimeInterface)
+            ? (new DateTime($tanggalLahir->format('Y-m-d')))
+            : (new DateTime(date('Y-m-d', strtotime($tanggalLahir))));
+
+        $dtRujukan = ($tanggalRujukan instanceof DateTimeInterface)
+            ? (new DateTime($tanggalRujukan->format('Y-m-d')))
+            : (empty($tanggalRujukan) ? new DateTime('today') : new DateTime(date('Y-m-d', strtotime($tanggalRujukan))));
+
+        $diff = $dtLahir->diff($dtRujukan);
+
+        $parts = [];
+        if ($diff->y > 0) $parts[] = $diff->y . ' Tahun';
+        if ($diff->m > 0) $parts[] = $diff->m . ' Bulan';
+        $parts[] = $diff->d . ' Hari';
+
+        return [
+            'tahun' => $diff->y,
+            'bulan' => $diff->m,
+            'hari'  => $diff->d,
+            'teks'  => implode(' ', $parts)
+        ];
+    } catch (Exception $e) {
+        return [
+            'tahun' => 0,
+            'bulan' => 0,
+            'hari'  => 0,
+            'teks'  => 'Format tanggal tidak valid'
+        ];
+    }
+}
+
