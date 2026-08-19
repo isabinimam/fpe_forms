@@ -69,14 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
         $error = 'Gagal memulai transaksi database.';
     } else {
         try {
-            $tanggal           = trim($_POST['tanggal_pelaksanaan'] ?? '');
-            $jam               = trim($_POST['jam_pelaksanaan'] ?? '');
-            $metode            = trim($_POST['metode'] ?? '');
-            $meeting_id        = trim($_POST['meeting_id'] ?? '');
-            $passcode          = trim($_POST['passcode'] ?? '');
-            $slot_waktu        = trim($_POST['slot_waktu'] ?? '');
-            $nomor_wa_keluarga = trim($_POST['nomor_wa_keluarga'] ?? '');
-            $nama_keluarga     = trim($_POST['nama_keluarga'] ?? '');
+            $tanggal               = trim($_POST['tanggal_pelaksanaan'] ?? '');
+            $jam                   = trim($_POST['jam_pelaksanaan'] ?? '');
+            $metode                = trim($_POST['metode'] ?? '');
+            $meeting_id            = trim($_POST['meeting_id'] ?? '');
+            $passcode              = trim($_POST['passcode'] ?? '');
+            $slot_waktu            = trim($_POST['slot_waktu'] ?? '');
+            $nomor_wa_keluarga     = trim($_POST['nomor_wa_keluarga'] ?? '');
+            $nama_keluarga         = trim($_POST['nama_keluarga'] ?? '');
+            $kirimManualLangsung   = isset($_POST['kirim_manual_langsung']) && $_POST['kirim_manual_langsung'] == '1';
 
             // Validasi kolom wajib
             if ($tanggal === '' || $jam === '' || $metode === '' || $slot_waktu === '' || $nomor_wa_keluarga === '') {
@@ -89,10 +90,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
                 throw new Exception('Nomor WhatsApp keluarga tidak valid. Masukkan nomor ponsel Indonesia yang benar (contoh: 081234567890).');
             }
 
-            // 1. Hitung Waktu Pengiriman Notifikasi (H-1 sebelum tanggal FPE)
+            // 1. Hitung Waktu Pengiriman Notifikasi
             $leadDays = WA_NOTIFICATION_LEAD_DAYS;
             $notifTime = WA_NOTIFICATION_TIME;
-            $scheduledAt = calculateScheduledAt($tanggal, $leadDays, $notifTime);
+            if ($kirimManualLangsung) {
+                $scheduledAt = (new DateTime('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d H:i:s');
+                $tipeNotif   = 'FPE_MANUAL';
+            } else {
+                $scheduledAt = calculateScheduledAt($tanggal, $leadDays, $notifTime);
+                $tipeNotif   = 'FPE_REMINDER';
+            }
 
             // 2. Susun Teks Pesan Pengingat
             $pesanWa = buildFpeReminderMessage([
@@ -139,19 +146,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['simpan_jadwal_fpe'])
             $idJadwalBaru = (int)$rowJadwal['id_jadwal'];
             sqlsrv_free_stmt($stmtJadwal);
 
-            // 4. Buat Antrean Notifikasi Otomatis di tbl_wa_queue
-            createWaQueueJob($conn, $idJadwalBaru, $cleanPhone, $pesanWa, $scheduledAt, 'FPE_REMINDER');
+            // 4. Buat Antrean Notifikasi di tbl_wa_queue
+            createWaQueueJob($conn, $idJadwalBaru, $cleanPhone, $pesanWa, $scheduledAt, $tipeNotif);
 
             // Commit transaksi jika seluruh langkah berhasil
             sqlsrv_commit($conn);
 
             $pesan = "Jadwal FPE berhasil disimpan.";
-            $notifInfo = "Notifikasi WhatsApp otomatis dijadwalkan untuk dikirim pada: <strong>" . htmlspecialchars($scheduledAt) . " WIB</strong> (H-{$leadDays}) ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>.";
+            if ($kirimManualLangsung) {
+                $notifInfo = "<span class='badge bg-primary me-1'><i class='bi bi-send-fill me-1'></i>Kirim Manual</span> Notifikasi WhatsApp langsung dimasukkan ke antrean kirim saat ini ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>. Pengingat otomatis H-1 tidak akan dikirim ganda.";
+            } else {
+                $notifInfo = "Notifikasi WhatsApp otomatis dijadwalkan untuk dikirim pada: <strong>" . htmlspecialchars($scheduledAt) . " WIB</strong> (H-{$leadDays}) ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>.";
+            }
 
         } catch (Exception $e) {
             sqlsrv_rollback($conn);
             $error = $e->getMessage();
         }
+    }
+}
+
+// ---------- PROSES PENGIRIMAN MANUAL DARI TABEL RIWAYAT ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kirim_manual_jadwal'])) {
+    $idJadwalKirim = (int)$_POST['id_jadwal_kirim'];
+    try {
+        $tsqlJ = "SELECT * FROM tbl_jadwal_fpe WHERE id_jadwal = ?";
+        $stmtJ = sqlsrv_query($conn, $tsqlJ, [$idJadwalKirim]);
+        if (!$stmtJ || !($rowJ = sqlsrv_fetch_array($stmtJ, SQLSRV_FETCH_ASSOC))) {
+            throw new Exception("Jadwal #{$idJadwalKirim} tidak ditemukan.");
+        }
+
+        $nowStr = (new DateTime('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d H:i:s');
+        $cleanPhone = normalizePhoneNumber($rowJ['nomor_wa']);
+        if (!$cleanPhone) {
+            throw new Exception("Nomor WhatsApp pada jadwal #{$idJadwalKirim} tidak valid.");
+        }
+
+        $tglStr = $rowJ['tanggal_pelaksanaan'] instanceof DateTimeInterface ? $rowJ['tanggal_pelaksanaan']->format('Y-m-d') : (string)$rowJ['tanggal_pelaksanaan'];
+        $jamStr = $rowJ['jam_pelaksanaan'] instanceof DateTimeInterface ? $rowJ['jam_pelaksanaan']->format('H:i:s') : (string)$rowJ['jam_pelaksanaan'];
+
+        $pesanWa = buildFpeReminderMessage([
+            'nama_pasien'         => $namaPasienDefault,
+            'nama_keluarga'       => $rowJ['nama_keluarga'],
+            'tanggal_pelaksanaan' => $tglStr,
+            'jam_pelaksanaan'     => $jamStr,
+            'metode'              => $rowJ['metode'],
+            'slot_waktu'          => $rowJ['slot_waktu'],
+            'meeting_id'          => $rowJ['meeting_id'],
+            'passcode'            => $rowJ['passcode']
+        ]);
+
+        // Cari antrean yang ada untuk jadwal ini
+        $tsqlCheckQ = "SELECT id, status FROM tbl_wa_queue WHERE id_jadwal = ? ORDER BY id DESC";
+        $stmtCheckQ = sqlsrv_query($conn, $tsqlCheckQ, [$idJadwalKirim]);
+        $existingQueue = null;
+        if ($stmtCheckQ && ($rowQ = sqlsrv_fetch_array($stmtCheckQ, SQLSRV_FETCH_ASSOC))) {
+            $existingQueue = $rowQ;
+        }
+
+        if ($existingQueue && $existingQueue['status'] === 'pending') {
+            // Ubah antrean pending yang ada menjadi kirim manual sekarang
+            $queueId = (int)$existingQueue['id'];
+            $tsqlUpdQ = "
+                UPDATE tbl_wa_queue 
+                SET status = 'pending', 
+                    scheduled_at = SYSDATETIME(), 
+                    tipe_notifikasi = 'FPE_MANUAL',
+                    pesan = ?, 
+                    attempts = 0, 
+                    last_error = NULL, 
+                    updated_at = SYSDATETIME() 
+                WHERE id = ?
+            ";
+            sqlsrv_query($conn, $tsqlUpdQ, [$pesanWa, $queueId]);
+        } else {
+            // Buat job antrean manual baru
+            $queueId = createWaQueueJob($conn, $idJadwalKirim, $cleanPhone, $pesanWa, $nowStr, 'FPE_MANUAL');
+        }
+
+        // Batalkan (gugurkan) semua antrean pending otomatis lain untuk jadwal ini agar tidak terkirim ganda
+        $tsqlCancelOther = "
+            UPDATE tbl_wa_queue 
+            SET status = 'cancelled', 
+                last_error = 'Otomatis gugur karena telah dikirim secara manual', 
+                updated_at = SYSDATETIME() 
+            WHERE id_jadwal = ? AND id != ? AND status = 'pending'
+        ";
+        sqlsrv_query($conn, $tsqlCancelOther, [$idJadwalKirim, $queueId]);
+
+        // Perbarui status jadwal di tbl_jadwal_fpe ke pending
+        sqlsrv_query($conn, "UPDATE tbl_jadwal_fpe SET status_kirim_wa = 'pending', jadwal_kirim_wa = SYSDATETIME() WHERE id_jadwal = ?", [$idJadwalKirim]);
+
+        $pesan = "Notifikasi WhatsApp untuk Jadwal #{$idJadwalKirim} disetel untuk DIKIRIM MANUAL SEKARANG.";
+        $notifInfo = "Pesan ditujukan ke nomor <strong>+" . htmlspecialchars($cleanPhone) . "</strong>. Pengingat otomatis H-1 yang belum terkirim otomatis <strong>gugur</strong> agar tidak ada pesan ganda.";
+    } catch (Exception $e) {
+        $error = $e->getMessage();
     }
 }
 
@@ -281,9 +370,15 @@ if ($stmtRiwayat !== false) {
           <input type="text" name="meeting_id" class="form-control" placeholder="Contoh: 838 1051 3404">
         </div>
 
-        <div id="fpe_zoom_pass" class="col-md-6" style="display:none;">
-          <label class="form-label fw-semibold">Passcode Zoom</label>
-          <input type="text" name="passcode" class="form-control" placeholder="Contoh: rskdds">
+        <!-- Opsi Kirim Langsung Sekarang (Manual) -->
+        <div class="col-12">
+          <div class="form-check form-switch p-3 bg-light rounded border">
+            <input class="form-check-input ms-0 me-2" type="checkbox" name="kirim_manual_langsung" id="kirim_manual_langsung" value="1">
+            <label class="form-check-label fw-semibold text-primary" for="kirim_manual_langsung">
+              <i class="bi bi-send-check-fill me-1"></i> Langsung Kirim Notifikasi WhatsApp Sekarang (Manual)
+            </label>
+            <div class="form-text text-muted ps-4">Centang opsi ini jika ingin notifikasi WhatsApp langsung dikirim detik ini juga saat jadwal disimpan (pengingat otomatis H-1 tidak akan dikirim ganda).</div>
+          </div>
         </div>
 
       </div>
@@ -336,9 +431,10 @@ if ($stmtRiwayat !== false) {
               <th>Metode</th>
               <th>Slot</th>
               <th>WhatsApp Keluarga</th>
-              <th style="width: 150px;">Status Notifikasi</th>
+              <th style="width: 140px;">Status Notifikasi</th>
               <th>Jadwal Kirim</th>
               <th>Petugas</th>
+              <th style="width: 150px;">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -381,6 +477,27 @@ if ($stmtRiwayat !== false) {
                 <?= !empty($j['wa_scheduled_at']) ? htmlspecialchars($j['wa_scheduled_at']) : '-' ?>
               </td>
               <td class="small text-center"><?= htmlspecialchars($j['dibuat_oleh'] ?? '-') ?></td>
+              <td class="text-center">
+                <?php if ($j['wa_status'] === 'sent'): ?>
+                  <form method="post" class="d-inline">
+                    <input type="hidden" name="id_jadwal_kirim" value="<?= (int)$j['id_jadwal'] ?>">
+                    <button type="submit" name="kirim_manual_jadwal" class="btn btn-sm btn-outline-secondary px-2 py-1 text-nowrap" title="Kirim ulang pesan WhatsApp ke nomor keluarga">
+                      <i class="bi bi-arrow-repeat me-1"></i> Kirim Ulang
+                    </button>
+                  </form>
+                <?php elseif ($j['wa_status'] === 'processing'): ?>
+                  <span class="badge bg-info text-dark px-2 py-1">
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span> Mengirim...
+                  </span>
+                <?php else: ?>
+                  <form method="post" class="d-inline">
+                    <input type="hidden" name="id_jadwal_kirim" value="<?= (int)$j['id_jadwal'] ?>">
+                    <button type="submit" name="kirim_manual_jadwal" class="btn btn-sm btn-success px-2 py-1 text-nowrap" title="Kirim notifikasi WhatsApp sekarang (pengingat otomatis akan gugur)">
+                      <i class="bi bi-send-fill me-1"></i> Kirim Manual
+                    </button>
+                  </form>
+                <?php endif; ?>
+              </td>
             </tr>
             <?php endforeach; ?>
           </tbody>

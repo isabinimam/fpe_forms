@@ -107,12 +107,13 @@ function waStatusBadgeClass(?string $status): string {
 }
 
 /**
- * Format tanggal ke Bahasa Indonesia (Contoh: 25 Agustus 2026)
+ * Format tanggal ke Bahasa Indonesia (Contoh: Rabu, 25 Agustus 2026)
  *
  * @param string|DateTimeInterface $date
+ * @param bool $withDay Sertakan nama hari (default: true)
  * @return string
  */
-function formatTanggalIndo($date): string {
+function formatTanggalIndo($date, bool $withDay = true): string {
     if ($date instanceof DateTimeInterface) {
         $timestamp = $date->getTimestamp();
     } else {
@@ -122,15 +123,24 @@ function formatTanggalIndo($date): string {
         return (string)$date;
     }
 
+    $hariIndo = [
+        'Sunday' => 'Minggu', 'Monday' => 'Senin', 'Tuesday' => 'Selasa',
+        'Wednesday' => 'Rabu', 'Thursday' => 'Kamis', 'Friday' => 'Jumat', 'Saturday' => 'Sabtu'
+    ];
+
     $bulanIndo = [
         1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
         5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
         9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
     ];
 
+    $namaHari = $hariIndo[date('l', $timestamp)] ?? '';
     $hari = date('d', $timestamp);
     $bulan = $bulanIndo[(int)date('m', $timestamp)];
     $tahun = date('Y', $timestamp);
 
+    if ($withDay && $namaHari !== '') {
+        return "{$namaHari}, {$hari} {$bulan} {$tahun}";
+    }
     return "{$hari} {$bulan} {$tahun}";
 }

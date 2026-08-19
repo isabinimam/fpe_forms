@@ -66,9 +66,9 @@ test('Format JID Baileys WhatsApp', () => {
 console.log('\n--- 2. Date Formatting & Message Template Tests ---');
 
 test('Format tanggal Indonesia', () => {
-    assert.strictEqual(formatTanggalIndo('2026-08-25'), '25 Agustus 2026');
-    assert.strictEqual(formatTanggalIndo('2026-01-01'), '1 Januari 2026');
-    assert.strictEqual(formatTanggalIndo('2026-12-31'), '31 Desember 2026');
+    assert.strictEqual(formatTanggalIndo('2026-08-25'), 'Selasa, 25 Agustus 2026');
+    assert.strictEqual(formatTanggalIndo('2026-01-01'), 'Kamis, 1 Januari 2026');
+    assert.strictEqual(formatTanggalIndo('2026-12-31'), 'Kamis, 31 Desember 2026');
 });
 
 test('Penyusunan pesan WhatsApp metode Video Call WA', () => {

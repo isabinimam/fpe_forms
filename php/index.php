@@ -83,10 +83,10 @@ if (WA_TEST_MODE && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kirim
             // Buat jadwal dummy dan antrean due-now
             $tsqlJadwalTes = "
                 INSERT INTO tbl_jadwal_fpe
-                    (id_pasien, tanggal_pelaksanaan, jam_pelaksanaan, metode, slot_waktu, nomor_wa_keluarga, nama_keluarga, dibuat_oleh, created_at, updated_at)
+                    (id_pasien, tanggal_pelaksanaan, jam_pelaksanaan, metode, slot_waktu, nomor_wa, nama_keluarga, status_kirim_wa, dibuat_oleh, created_at)
                 OUTPUT INSERTED.id_jadwal
                 VALUES
-                    (?, CAST(GETDATE() AS DATE), CAST(GETDATE() AS TIME), 'video_call_wa', '10.00-12.00', ?, N'Keluarga Tes', N'Tester Otomatis', SYSDATETIME(), SYSDATETIME())
+                    (?, CAST(GETDATE() AS DATE), CAST(GETDATE() AS TIME), 'video_call_wa', '10.00-12.00', ?, N'Keluarga Tes', 'pending', N'Tester Otomatis', SYSDATETIME())
             ";
             $stmtJT = sqlsrv_query($conn, $tsqlJadwalTes, [$id_pasien, $cleanTes]);
             if ($stmtJT === false) {
@@ -255,7 +255,7 @@ if ($stmtQAll !== false) {
     </li>
     <li class="nav-item">
       <a class="nav-link <?= $tabAktif === 'queue' ? 'active' : '' ?>" href="?id_pasien=<?= $id_pasien ?>&tab=queue">
-        <i class="bi bi-broadcast me-1"></i> 5. Monitoring Antrean WA & Tes Cepat
+        <i class="bi bi-broadcast me-1"></i> 5. Monitoring Antrean WhatsApp
       </a>
     </li>
   </ul>
@@ -274,13 +274,13 @@ if ($stmtQAll !== false) {
     <?php include __DIR__ . '/form_skrining_bunuh_diri.php'; ?>
 
   <?php elseif ($tabAktif === 'queue'): ?>
-    <!-- TAB MONITORING ANTREAN WHATSAPP & TES CEPAT -->
+    <!-- TAB MONITORING ANTREAN WHATSAPP & PENGIRIMAN MANUAL -->
     <div class="row">
-      <!-- Panel Kirim Tes WhatsApp -->
+      <!-- Panel Pengiriman WhatsApp Manual -->
       <div class="col-lg-4 mb-4">
         <div class="card shadow-sm border-0 h-100">
           <div class="card-header bg-success text-white py-3">
-            <h6 class="mb-0 fw-semibold"><i class="bi bi-send-fill me-2"></i>Kirim Pengujian WhatsApp Cepat</h6>
+            <h6 class="mb-0 fw-semibold"><i class="bi bi-send-fill me-2"></i>Kirim Notifikasi WhatsApp Manual</h6>
           </div>
           <div class="card-body p-4">
             <?php if ($pesanTes !== ''): ?>
@@ -291,23 +291,24 @@ if ($stmtQAll !== false) {
             <?php endif; ?>
 
             <form method="post">
+              <input type="hidden" name="kirim_tes_wa" value="1">
               <div class="mb-3">
                 <label class="form-label fw-semibold">Nomor WhatsApp Tujuan</label>
                 <input type="tel" name="nomor_tujuan_tes" class="form-control" placeholder="Contoh: 085159811407" required value="<?= htmlspecialchars(getenv('WA_TEST_PHONE') ?: '6285159811407') ?>">
-                <div class="form-text">Masukkan nomor pengujian Anda.</div>
+                <div class="form-text">Nomor ponsel penerima notifikasi.</div>
               </div>
 
               <div class="mb-3">
                 <label class="form-label fw-semibold">Pesan Khusus (Opsional)</label>
-                <textarea name="pesan_tes" class="form-control" rows="3" placeholder="Biarkan kosong untuk menggunakan template resmi FPE..."></textarea>
+                <textarea name="pesan_tes" class="form-control" rows="3" placeholder="Biarkan kosong untuk menggunakan format resmi FPE..."></textarea>
               </div>
 
               <div class="alert alert-light border small text-muted">
-                <i class="bi bi-info-circle me-1"></i> Tombol ini memasukkan antrean <em>due-now</em> ke database. Pastikan worker Node.js (<code>node src/worker.js</code>) sedang berjalan.
+                <i class="bi bi-info-circle me-1"></i> Pesan akan langsung dimasukkan ke antrean pengiriman dan dikirim oleh worker Node.js.
               </div>
 
               <button type="submit" name="kirim_tes_wa" class="btn btn-success w-100 fw-semibold">
-                <i class="bi bi-whatsapp me-1"></i> Masukkan Antrean Pengujian
+                <i class="bi bi-send-fill me-1"></i> Kirim Notifikasi Sekarang
               </button>
             </form>
           </div>

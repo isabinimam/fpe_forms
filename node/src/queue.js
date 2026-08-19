@@ -101,13 +101,33 @@ async function markJobSent(pool, jobId, providerMessageId = null) {
                 locked_by = NULL,
                 last_error = NULL,
                 updated_at = SYSDATETIME()
-            WHERE id = @jobId
+            WHERE id = @jobId;
+
+            -- Sinkronkan status pengiriman ke tabel jadwal FPE
+            UPDATE j
+            SET j.status_kirim_wa = 'sent',
+                j.waktu_terkirim = SYSDATETIME(),
+                j.log_error = NULL
+            FROM tbl_jadwal_fpe j
+            INNER JOIN tbl_wa_queue q ON j.id_jadwal = q.id_jadwal
+            WHERE q.id = @jobId;
+
+            -- Batalkan antrean pending lain untuk jadwal yang sama (gugur otomatis)
+            UPDATE q_other
+            SET q_other.status = 'cancelled',
+                q_other.last_error = 'Otomatis gugur karena notifikasi untuk jadwal ini telah terkirim',
+                q_other.updated_at = SYSDATETIME()
+            FROM tbl_wa_queue q_other
+            INNER JOIN tbl_wa_queue q_current ON q_other.id_jadwal = q_current.id_jadwal
+            WHERE q_current.id = @jobId 
+              AND q_other.id != @jobId 
+              AND q_other.status = 'pending';
         `;
         const request = pool.request();
         request.input('jobId', sql.Int, jobId);
         request.input('providerMessageId', sql.NVarChar(255), providerMessageId);
         await request.query(query);
-        console.log(`[QUEUE] Antrean #${jobId} berhasil diperbarui ke status 'sent'.`);
+        console.log(`[QUEUE] Antrean #${jobId} berhasil diperbarui ke status 'sent' dan disinkronkan ke tbl_jadwal_fpe.`);
     } catch (err) {
         console.error(`[QUEUE ERROR] Gagal memperbarui status sent #${jobId}: ${err.message}`);
     }
