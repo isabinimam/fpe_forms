@@ -44,9 +44,7 @@ php_forms/
 │   ├── form_jadwal_fpe.php          # 📅 1. Form Penjadwalan FPE, Antrean H-1, & Kirim Manual
 │   ├── form_dokumentasi_fpe.php     # 📝 2. Form Bukti Dokumentasi FPE (Multiple Choice Checkbox)
 │   ├── form_kegiatan_pasien.php     # 📋 3. Form Jadwal Kegiatan Pasien (Grid 10 Hari Adaptif)
-│   ├── form_skrining_bunuh_diri.php # 🛡️ 4. Form Skrining Risiko Bunuh Diri (Umur Akurat & Asal Pasien)
-│   ├── config/                      # ⚠️ Konfigurasi standalone testing lokal (diabaikan git)
-│   └── index.php                    # ⚠️ Test harness dashboard lokal (diabaikan git)
+│   └── form_skrining_bunuh_diri.php # 🛡️ 4. Form Skrining Risiko Bunuh Diri (Umur Akurat & Asal Pasien)
 │
 ├── node/
 │   ├── src/
@@ -61,8 +59,9 @@ php_forms/
 │   │       └── CloudApiProvider.js  # Provider resmi produksi (Meta Cloud API)
 │   ├── tests/
 │   │   └── unit.test.js             # Pengujian unit otomatis (10/10 PASS)
-│   ├── package.json
-│   └── .env.example
+│   ├── package-lock.json            # Lockfile dependensi Node.js
+│   ├── package.json                 # Manifest dependensi & skrip Node.js
+│   └── .env.example                 # Template konfigurasi environment worker
 │
 ├── database/
 │   └── sqlserver.sql                # Skema DDL lengkap SQL Server (6 tabel produksi)
@@ -74,9 +73,9 @@ php_forms/
 │   ├── testing.md                   # Panduan pengujian (sintaks, unit, E2E)
 │   └── whatsapp-providers.md        # Panduan beralih ke WhatsApp Cloud API Meta
 │
-├── .env.example                     # Contoh konfigurasi environment
-├── .gitignore                       # Git ignore bersih untuk aset non-integrasi
-└── README.md
+├── .env.example                     # Contoh konfigurasi environment PHP
+├── .gitignore                       # Konfigurasi ignore Git (hanya melacak berkas produksi)
+└── README.md                        # Dokumentasi utama proyek
 ```
 
 ---
